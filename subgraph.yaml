@@ -1,0 +1,77 @@
+specVersion: 1.2.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: OmniNadsMinter
+    network: monad-testnet
+    source:
+      address: "0xf5a391D2409993f0FF7EF189ceEDB36643584dA2"
+      abi: OmniNadsMinter
+      startBlock: 6662817
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - AllowedSmartContractUpdated
+        - Approval
+        - ApprovalForAll
+        - BaseURISet
+        - EnforcedOptionSet
+        - MsgInspectorSet
+        - ONFTReceived
+        - ONFTSent
+        - OwnershipTransferred
+        - PeerSet
+        - PreCrimeSet
+        - PublicMint
+        - PublicPhaseStarted
+        - TokenEvolved
+        - Transfer
+        - WhitelistMint
+        - WhitelistPhaseStarted
+        - WhitelistUpdated
+      abis:
+        - name: OmniNadsMinter
+          file: ./abis/OmniNadsMinter.json
+      eventHandlers:
+        - event: AllowedSmartContractUpdated(indexed address,bool)
+          handler: handleAllowedSmartContractUpdated
+        - event: Approval(indexed address,indexed address,indexed uint256)
+          handler: handleApproval
+        - event: ApprovalForAll(indexed address,indexed address,bool)
+          handler: handleApprovalForAll
+        - event: BaseURISet(string)
+          handler: handleBaseURISet
+        - event: EnforcedOptionSet((uint32,uint16,bytes)[])
+          handler: handleEnforcedOptionSet
+        - event: MsgInspectorSet(address)
+          handler: handleMsgInspectorSet
+        - event: ONFTReceived(indexed bytes32,uint32,indexed address,uint256)
+          handler: handleONFTReceived
+        - event: ONFTSent(indexed bytes32,uint32,indexed address,uint256)
+          handler: handleONFTSent
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: PeerSet(uint32,bytes32)
+          handler: handlePeerSet
+        - event: PreCrimeSet(address)
+          handler: handlePreCrimeSet
+        - event: PublicMint(indexed uint256,indexed address)
+          handler: handlePublicMint
+        - event: PublicPhaseStarted()
+          handler: handlePublicPhaseStarted
+        - event: TokenEvolved(indexed uint256,indexed uint8)
+          handler: handleTokenEvolved
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+        - event: WhitelistMint(indexed uint256,indexed address)
+          handler: handleWhitelistMint
+        - event: WhitelistPhaseStarted()
+          handler: handleWhitelistPhaseStarted
+        - event: WhitelistUpdated(indexed address,bool)
+          handler: handleWhitelistUpdated
+      file: ./src/omni-nads-minter.ts

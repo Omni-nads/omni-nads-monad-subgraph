@@ -1,0 +1,8 @@
+{
+  "monad-testnet": {
+    "OmniNadsMinter": {
+      "address": "0xf5a391D2409993f0FF7EF189ceEDB36643584dA2",
+      "startBlock": 6662817
+    }
+  }
+}
