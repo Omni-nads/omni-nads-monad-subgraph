@@ -160,3 +160,23 @@ type WhitelistUpdated @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+
+type Token @entity {
+  id: ID!
+  tokenId: BigInt!
+  owner: Bytes!
+  evolution: Int!  
+  contract: Bytes!
+  tokenURI: String
+  tokenState: String      
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Global @entity {
+  id: ID!                
+  baseURI: String!
+  tokenIds: [String!]!
+}
+

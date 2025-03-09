@@ -16,7 +16,8 @@ import {
   Transfer as TransferEvent,
   WhitelistMint as WhitelistMintEvent,
   WhitelistPhaseStarted as WhitelistPhaseStartedEvent,
-  WhitelistUpdated as WhitelistUpdatedEvent
+  WhitelistUpdated as WhitelistUpdatedEvent,
+  OmniNadsMinter
 } from "../generated/OmniNadsMinter/OmniNadsMinter"
 import {
   AllowedSmartContractUpdated,
@@ -36,9 +37,79 @@ import {
   Transfer,
   WhitelistMint,
   WhitelistPhaseStarted,
-  WhitelistUpdated
+  WhitelistUpdated,
+  Token,
+  Global
 } from "../generated/schema"
-import { Bytes } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts"
+
+export const BASE_URI: string = "https://arweave.net/XI2afr4wHl_M78ovIGYzCPvU0O8126DndmZ-L3VjrMY/monad/";
+
+class DecodedToken {
+  realTokenId: BigInt;
+  tokenState: BigInt;
+
+  constructor(realTokenId: BigInt, tokenState: BigInt) {
+    this.realTokenId = realTokenId;
+    this.tokenState = tokenState;
+  }
+}
+
+function decodeTokenInfo(encoded: BigInt): DecodedToken {
+  let tokenState = encoded.mod(BigInt.fromI32(10));
+  let realTokenId = encoded.div(BigInt.fromI32(10));
+  return new DecodedToken(realTokenId, tokenState);
+}
+
+export function getOrCreateToken(event: ethereum.Event, tokenId: BigInt): Token {
+  let id = tokenId.toString();
+  let token = Token.load(id);
+  if (!token) {
+    token = new Token(id);
+    token.tokenId = tokenId;
+    token.contract = event.address;
+    token.evolution = 0; 
+  }
+  
+  token.blockNumber = event.block.number;
+  token.blockTimestamp = event.block.timestamp;
+  token.transactionHash = event.transaction.hash;
+  
+  let contract = OmniNadsMinter.bind(event.address);
+  
+  let tokenStateCall = contract.try_tokenState(tokenId);
+  if (!tokenStateCall.reverted) {
+    token.tokenState = tokenStateCall.value.toString();
+  }
+  
+  let tokenURICall = contract.try_tokenURI(tokenId);
+  if (!tokenURICall.reverted && tokenURICall.value != "") {
+    token.tokenURI = tokenURICall.value;
+  } else {
+    let safeState: string;
+    if (token.tokenState == null) {
+      safeState = "1";
+    } else {
+      safeState = token.tokenState as string;
+    }
+    token.tokenURI = BASE_URI.concat(safeState).concat("/omninad.json");
+  }
+  
+  return token as Token;
+}
+
+function updateGlobalTokenList(tokenId: string): void {
+  let global = Global.load("global");
+  if (global == null) {
+    global = new Global("global");
+    global.baseURI = BASE_URI;
+    global.tokenIds = new Array<string>();
+  }
+  if (global.tokenIds.indexOf(tokenId) == -1) {
+    global.tokenIds.push(tokenId);
+  }
+  global.save();
+}
 
 export function handleAllowedSmartContractUpdated(
   event: AllowedSmartContractUpdatedEvent
@@ -89,14 +160,30 @@ export function handleApprovalForAll(event: ApprovalForAllEvent): void {
 export function handleBaseURISet(event: BaseURISetEvent): void {
   let entity = new BaseURISet(
     event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.baseURI = event.params.baseURI
+  );
+  entity.baseURI = event.params.baseURI;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
+  let global = Global.load("global");
+  if (global == null) {
+    global = new Global("global");
+    global.tokenIds = new Array<string>();
+  }
+  global.baseURI = event.params.baseURI;
+  global.save();
 
-  entity.save()
+  for (let i = 0; i < global.tokenIds.length; i++) {
+    let tokenId = global.tokenIds[i];
+    let token = Token.load(tokenId);
+    if (token) {
+      let safeState: string = token.tokenState ? token.tokenState as string : "1";
+      token.tokenURI = event.params.baseURI.concat(safeState).concat("/omninad.json");
+      token.save();
+    }
+  }
 }
 
 export function handleEnforcedOptionSet(event: EnforcedOptionSetEvent): void {
@@ -125,37 +212,50 @@ export function handleMsgInspectorSet(event: MsgInspectorSetEvent): void {
   entity.save()
 }
 
-export function handleONFTReceived(event: ONFTReceivedEvent): void {
-  let entity = new ONFTReceived(
+export function handleTransfer(event: TransferEvent): void {
+
+  let token = getOrCreateToken(event, event.params.tokenId);
+  token.owner = event.params.to;
+  token.save();
+
+  let entity = new Transfer(
     event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.guid = event.params.guid
-  entity.srcEid = event.params.srcEid
-  entity.toAddress = event.params.toAddress
-  entity.tokenId = event.params.tokenId
+  );
+  entity.from = event.params.from;
+  entity.to = event.params.to;
+  entity.tokenId = event.params.tokenId;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
+}
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
+export function handleONFTReceived(event: ONFTReceivedEvent): void {
+  let encoded = event.params.tokenId;
+  let decoded = decodeTokenInfo(encoded);
+  let realTokenId = decoded.realTokenId;
+  let parsedState = decoded.tokenState;
 
-  entity.save()
+  let token = getOrCreateToken(event, realTokenId);
+  token.owner = event.params.toAddress;
+  token.tokenState = parsedState.toString();
+
+  token.save();
 }
 
 export function handleONFTSent(event: ONFTSentEvent): void {
-  let entity = new ONFTSent(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.guid = event.params.guid
-  entity.dstEid = event.params.dstEid
-  entity.fromAddress = event.params.fromAddress
-  entity.tokenId = event.params.tokenId
+  let encoded = event.params.tokenId;
+  let decoded = decodeTokenInfo(encoded); 
+  let realTokenId = decoded.realTokenId;
+  let parsedState = decoded.tokenState;
+  let token = getOrCreateToken(event, realTokenId);
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  token.owner = Bytes.fromHexString("0x0000000000000000000000000000000000000000")!;
+  token.tokenState = parsedState.toString();  
+  
+  token.save();
 }
+
 
 export function handleOwnershipTransferred(
   event: OwnershipTransferredEvent
@@ -201,17 +301,21 @@ export function handlePreCrimeSet(event: PreCrimeSetEvent): void {
 }
 
 export function handlePublicMint(event: PublicMintEvent): void {
+  let token = getOrCreateToken(event, event.params.tokenId);
+  token.owner = event.params.minter;
+  token.save();
+
+  updateGlobalTokenList(event.params.tokenId.toString());
+
   let entity = new PublicMint(
     event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.tokenId = event.params.tokenId
-  entity.minter = event.params.minter
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  );
+  entity.tokenId = event.params.tokenId;
+  entity.minter = event.params.minter;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 }
 
 export function handlePublicPhaseStarted(event: PublicPhaseStartedEvent): void {
@@ -227,47 +331,30 @@ export function handlePublicPhaseStarted(event: PublicPhaseStartedEvent): void {
 }
 
 export function handleTokenEvolved(event: TokenEvolvedEvent): void {
-  let entity = new TokenEvolved(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.tokenId = event.params.tokenId
-  entity.evolution = event.params.evolution
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  let token = getOrCreateToken(event, event.params.tokenId)
+  token.tokenState = event.params.evolution.toString() 
+  token.save()
 }
 
-export function handleTransfer(event: TransferEvent): void {
-  let entity = new Transfer(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.from = event.params.from
-  entity.to = event.params.to
-  entity.tokenId = event.params.tokenId
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
 
 export function handleWhitelistMint(event: WhitelistMintEvent): void {
+  let token = getOrCreateToken(event, event.params.tokenId);
+  token.owner = event.params.minter;  
+  token.save();
+
+  updateGlobalTokenList(event.params.tokenId.toString());
+
   let entity = new WhitelistMint(
     event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.tokenId = event.params.tokenId
-  entity.minter = event.params.minter
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  );
+  entity.tokenId = event.params.tokenId;
+  entity.minter = event.params.minter;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 }
+
 
 export function handleWhitelistPhaseStarted(
   event: WhitelistPhaseStartedEvent
