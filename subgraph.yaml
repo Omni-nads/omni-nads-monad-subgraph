@@ -10,7 +10,7 @@ dataSources:
     source:
       address: "0xf5a391D2409993f0FF7EF189ceEDB36643584dA2"
       abi: OmniNadsMinter
-      startBlock: 6662817
+      startBlock: 6662469
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
