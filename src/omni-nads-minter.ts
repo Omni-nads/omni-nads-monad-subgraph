@@ -45,7 +45,7 @@ import {
 
 import { BigInt, Bytes, ethereum, Address } from "@graphprotocol/graph-ts"
 
-export const BASE_URI: string = "https://arweave.net/XI2afr4wHl_M78ovIGYzCPvU0O8126DndmZ-L3VjrMY/monad/";
+export const BASE_URI: string = "https://arweave.net/KTNUM70p_uS38bAUzrwmBFiMAIrXoiBQFzIGTRfDMu4/monad/";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 class DecodedToken {

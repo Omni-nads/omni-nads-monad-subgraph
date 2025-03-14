@@ -129,4 +129,18 @@ You can also query event entities like:
 
 ---
 
-**Happy Building on Monad!** If you have questions, please open an issue or discussion in this repository.
+## Here’s an improved version of your comment with better clarity, grammar, and readability:
+
+---
+
+## Challenges Faced During the Hackathon  
+### Issues on Monad Testnet with The Graph  
+
+Throughout the hackathon, we encountered several challenges, particularly when deploying our subgraph on the Monad Testnet using The Graph. We performed multiple deployments to index data, which was then integrated across our UI components.  
+
+In the final 48 hours leading up to the submission, we faced significant issues due to RPC outages. As a result, the subgraph lagged behind by approximately **935K blocks** at the time of this commit. This delay severely impacted our ability to demonstrate key features, including:  
+- **Bridging NFTs across chains**  
+- **Fetching and displaying data within the application**  
+- **Showing rankings and NFT evolution steps in our leaderboard**  
+
+These issues restricted our ability to showcase the full functionality of our project, highlighting the importance of reliable infrastructure in blockchain applications.  
